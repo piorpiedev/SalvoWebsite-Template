@@ -1,2 +1,11 @@
 /target
+/certs
+/logs
+/data
 /migration/target
+/.vscode
+
+Cargo.lock
+
+# .env
+# config.toml

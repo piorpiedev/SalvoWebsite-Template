@@ -1,23 +1,39 @@
+use std::path::Path;
 use std::sync::OnceLock;
 
 use figment::Figment;
-use figment::providers::{Env, Format, Toml};
-use serde::Deserialize;
+use figment::providers::{Env, Format, Serialized, Toml};
+use serde::{Deserialize, Serialize};
 
-mod log_config;
-pub use log_config::LogConfig;
-mod db_config;
-pub use db_config::DbConfig;
+mod log;
+pub use log::LogConfig;
+mod db;
+pub use db::DbConfig;
+use tokio::fs;
 
 pub static CONFIG: OnceLock<ServerConfig> = OnceLock::new();
 
-pub fn init() {
-    let raw_config = Figment::new()
-        .merge(Toml::file(
-            Env::var("APP_CONFIG").as_deref().unwrap_or("config.toml"),
-        ))
-        .merge(Env::prefixed("APP_").global());
+pub async fn init() {
+    let path = Env::var("APP_CONFIG").unwrap_or("config.toml".to_owned());
 
+    // Load from file or create default
+    let raw_config = if !Path::new(&path).exists() {
+        let config = ServerConfig::default();
+        match toml::to_string_pretty(&config) {
+            Ok(serialized) => {
+                if let Err(e) = fs::write(&path, serialized).await {
+                    tracing::error!("Failed to write default config file: {}", e);
+                }
+            }
+            Err(e) => tracing::error!("Failed to generate default server config: {}", e),
+        }
+        Figment::new().merge(Serialized::defaults(config))
+    } else {
+        Figment::new().merge(Toml::file(&path))
+    };
+
+    // Merge env before loading
+    let raw_config = raw_config.merge(Env::prefixed("APP_").global());
     let mut config = match raw_config.extract::<ServerConfig>() {
         Ok(s) => s,
         Err(e) => {
@@ -25,6 +41,8 @@ pub fn init() {
             std::process::exit(1);
         }
     };
+
+    // Also accept db url as env in sqlx format
     if config.db.url.is_empty() {
         config.db.url = std::env::var("DATABASE_URL").unwrap_or_default();
     }
@@ -32,45 +50,45 @@ pub fn init() {
         eprintln!("DATABASE_URL is not set");
         std::process::exit(1);
     }
+
+    // Set config
     crate::config::CONFIG
         .set(config)
         .expect("config should be set");
 }
+
 pub fn get() -> &'static ServerConfig {
     CONFIG.get().expect("config should be set")
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ServerConfig {
-    #[serde(default = "default_listen_addr")]
     pub listen_addr: String,
 
     pub db: DbConfig,
     pub log: LogConfig,
-    pub jwt: JwtConfig,
-    pub tls: Option<TlsConfig>,
+    pub tls: TlsConfig,
 }
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct JwtConfig {
-    pub secret: String,
-    pub expiry: i64,
-}
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct TlsConfig {
-    pub cert: String,
-    pub key: String,
+    pub enabled: bool,
+    pub cert_path: String,
+    pub key_path: String,
 }
 
-#[allow(dead_code)]
-pub fn default_false() -> bool {
-    false
-}
-#[allow(dead_code)]
-pub fn default_true() -> bool {
-    true
-}
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            listen_addr: "127.0.0.1:8008".to_owned(),
 
-fn default_listen_addr() -> String {
-    "127.0.0.1:8008".into()
+            db: DbConfig::default(),
+            log: LogConfig::default(),
+            tls: TlsConfig {
+                enabled: false,
+                cert_path: String::new(),
+                key_path: String::new(),
+            },
+        }
+    }
 }

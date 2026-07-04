@@ -1,166 +1,138 @@
-use rinja::Template;
 use salvo::oapi::extract::*;
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
-use ulid::Ulid;
 use validator::Validate;
-use crate::hoops::jwt;
 
-use crate::models::SafeUser;
-use crate::{db, empty_ok, json_ok, utils, AppResult, EmptyResult, JsonResult};
-
-#[derive(Template)]
-#[template(path = "user_list_page.html")]
-pub struct UserListPageTemplate {}
-
-#[derive(Template)]
-#[template(path = "user_list_frag.html")]
-pub struct UserListFragTemplate {}
+use crate::utils::hash_password;
+use crate::{AppResult, JsonResult, db, render_template};
 
 #[handler]
 pub async fn list_page(req: &mut Request, res: &mut Response) -> AppResult<()> {
     let is_fragment = req.headers().get("X-Fragment-Header");
-    if let Some(cookie) = res.cookies().get("jwt_token") {
-        let token = cookie.value().to_string();
-        if !jwt::decode_token(&token) {
-            res.render(Redirect::other("/login"));
-        }
-    }
     match is_fragment {
         Some(_) => {
-            let hello_tmpl = UserListFragTemplate {};
-            res.render(Text::Html(hello_tmpl.render().unwrap()));
+            res.render(render_template!("user_list_frag.html"));
         }
         None => {
-            let hello_tmpl = UserListPageTemplate {};
-            res.render(Text::Html(hello_tmpl.render().unwrap()));
+            res.render(render_template!("user_list_page.html"));
         }
     }
     Ok(())
 }
 
-#[derive(Deserialize, Debug, Validate, ToSchema, Default)]
-pub struct CreateInData {
-    #[validate(length(min = 5, message = "username length must be greater than 5"))]
+#[derive(Deserialize, Validate, ToSchema)]
+pub struct UserUpdateData {
+    #[validate(length(
+        min = 3,
+        max = 16,
+        message = "Username must be between 3 and 16 characters"
+    ))]
     pub username: String,
-    #[validate(length(min = 6, message = "password length must be greater than 5"))]
+    #[validate(length(
+        min = 8,
+        max = 64,
+        message = "Password must be between 8 and 64 characters"
+    ))]
     pub password: String,
 }
+#[derive(ToSchema, Serialize, Debug)]
+pub struct UserInfo {
+    pub id: i32,
+    pub username: String,
+}
+
 #[endpoint(tags("users"))]
-pub async fn create_user(idata: JsonBody<CreateInData>) -> JsonResult<SafeUser> {
-    let CreateInData { username, password } = idata.into_inner();
-    let id = Ulid::new().to_string();
-    let password = utils::hash_password(&password)?;
-    let conn = db::pool();
-    let _ = sqlx::query!(
-        r#"
-            INSERT INTO users (id, username, password)
-            VALUES ($1, $2, $3)
-            "#,
-        id,
-        username,
-        password,
-    )
-    .execute(conn)
-    .await?;
+pub async fn create_user(idata: JsonBody<UserUpdateData>) -> JsonResult<UserInfo> {
+    let UserUpdateData { username, password } = idata.into_inner();
+    let password_hash = hash_password(&password)?;
 
-    json_ok(SafeUser { id, username })
-}
-
-#[derive(Deserialize, Debug, Validate, ToSchema)]
-struct UpdateInData {
-    #[validate(length(min = 5, message = "username length must be greater than 5"))]
-    username: String,
-    #[validate(length(min = 6, message = "password length must be greater than 5"))]
-    password: String,
-}
-#[endpoint(tags("users"), parameters(("user_id", description = "user id")))]
-pub async fn update_user(
-    user_id: PathParam<String>,
-    idata: JsonBody<UpdateInData>,
-) -> JsonResult<SafeUser> {
-    let user_id = user_id.into_inner();
-    let UpdateInData { username, password } = idata.into_inner();
     let conn = db::pool();
-    let _ = sqlx::query!(
-        r#"
-            UPDATE users
-            SET username = $1, password = $2
-            WHERE id = $3
-            "#,
-        username,
-        password,
-        user_id,
-    )
-    .execute(conn)
-    .await?;
-    json_ok(SafeUser {
+    let user_id = db::users::create_user(conn, &username, &password_hash).await?;
+
+    Ok(Json(UserInfo {
         id: user_id,
         username,
-    })
+    }))
+}
+
+#[endpoint(tags("users"), parameters(("user_id", description = "user id")))]
+pub async fn update_user(
+    user_id: PathParam<i32>,
+    idata: JsonBody<UserUpdateData>,
+) -> JsonResult<UserInfo> {
+    let user_id = user_id.into_inner();
+    let UserUpdateData { username, password } = idata.into_inner();
+    let password_hash = hash_password(&password)?;
+
+    let conn = db::pool();
+    db::users::update_user(conn, user_id, &username, &password_hash).await?;
+
+    Ok(Json(UserInfo {
+        id: user_id,
+        username,
+    }))
 }
 
 #[endpoint(tags("users"))]
-pub async fn delete_user(user_id: PathParam<String>) -> EmptyResult {
+pub async fn delete_user(user_id: PathParam<i32>) -> AppResult<()> {
     let user_id = user_id.into_inner();
+
     let conn = db::pool();
-    sqlx::query!(
-        r#"
-            DELETE FROM users
-            WHERE id = $1
-            "#,
-        user_id,
-    )
-    .execute(conn)
-    .await?;
-    empty_ok()
+    db::users::delete_user(conn, user_id).await?;
+
+    Ok(())
 }
 
 #[derive(Debug, Deserialize, Validate, Extractible, ToSchema)]
 #[salvo(extract(default_source(from = "query")))]
+#[serde(default)]
 pub struct UserListQuery {
     pub username: Option<String>,
-    #[serde(default = "default_page")]
     pub current_page: i64,
-    #[serde(default = "default_page_size")]
     pub page_size: i64,
 }
-
-fn default_page() -> i64 { 1 }
-fn default_page_size() -> i64 { 10 }
+impl Default for UserListQuery {
+    fn default() -> Self {
+        Self {
+            username: None,
+            current_page: 1,
+            page_size: 10,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UserListResponse {
-    pub data: Vec<SafeUser>,
+    pub data: Vec<UserInfo>,
     pub total: i64,
     pub current_page: i64,
     pub page_size: i64,
 }
 
 #[endpoint(tags("users"))]
-pub async fn list_users(query: &mut Request) -> JsonResult<UserListResponse> {
+pub async fn list_users(query: &mut Request, depot: &mut Depot) -> JsonResult<UserListResponse> {
     let conn = db::pool();
-    let query: UserListQuery = query.extract().await?;
+    let query: UserListQuery = query.extract(depot).await?;
     let username_filter = query.username.clone().unwrap_or_default();
     let like_pattern = format!("%{}%", username_filter);
     let offset = (query.current_page - 1) * query.page_size;
-    
+
     let total = sqlx::query_scalar!(
         r#"
-        SELECT COUNT(*) as "count!: i64" FROM users
-        WHERE username LIKE $1
+            SELECT COUNT(*) as "count!: i64" FROM users
+            WHERE username LIKE $1
         "#,
         like_pattern
     )
     .fetch_one(conn)
     .await?;
-    
+
     let users = sqlx::query_as!(
-        SafeUser,
+        UserInfo,
         r#"
-        SELECT id, username FROM users
-        WHERE username LIKE $1
-        LIMIT $2 OFFSET $3
+            SELECT id, username FROM users
+            WHERE username LIKE $1
+            LIMIT $2 OFFSET $3
         "#,
         like_pattern,
         query.page_size,
@@ -168,11 +140,11 @@ pub async fn list_users(query: &mut Request) -> JsonResult<UserListResponse> {
     )
     .fetch_all(conn)
     .await?;
-    
-    json_ok(UserListResponse {
+
+    Ok(Json(UserListResponse {
         data: users,
         total,
         current_page: query.current_page,
         page_size: query.page_size,
-    })
+    }))
 }

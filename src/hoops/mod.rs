@@ -1,30 +1,21 @@
-use rinja::Template;
 use salvo::http::ResBody;
 use salvo::prelude::*;
 
-pub mod custom_middleware_example;
-pub mod jwt;
-pub use jwt::auth_hoop;
-mod cors;
-pub use cors::cors_hoop;
+use crate::render_template;
 
-#[derive(Template)]
-#[template(path = "error_404.html")]
-struct Error404 {
-    brief: String,
-}
+pub mod auth;
+pub mod cors;
 
 #[handler]
-pub async fn error_404(&self, res: &mut Response, ctrl: &mut FlowCtrl) {
+pub async fn handle_404(&self, res: &mut Response, ctrl: &mut FlowCtrl) {
     if let Some(StatusCode::NOT_FOUND) = res.status_code {
-        let handle404 = Error404 {
+        res.render(render_template!("error_404.html", {
             brief: if let ResBody::Error(e) = &res.body {
                 e.brief.clone()
             } else {
                 "Page not found".to_owned()
-            },
-        };
-        res.render(Text::Html(handle404.render().unwrap()));
+            }
+        }));
         ctrl.skip_rest();
     }
 }

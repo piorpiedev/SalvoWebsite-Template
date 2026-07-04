@@ -1,70 +1,41 @@
 // https://github.com/clia/tracing-config/blob/main/src/lib.rs
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt;
 
 use tracing_appender::rolling;
-
-use super::default_true;
 
 const FORMAT_PRETTY: &str = "pretty";
 const FORMAT_COMPACT: &str = "compact";
 const FORMAT_JSON: &str = "json";
 const FORMAT_FULL: &str = "full";
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct LogConfig {
-    #[serde(default = "default_filter_level")]
     pub filter_level: String,
-    #[serde(default = "default_true")]
     pub with_ansi: bool,
-    #[serde(default = "default_true")]
     pub stdout: bool,
-    #[serde(default = "default_directory")]
     pub directory: String,
-    #[serde(default = "default_file_name")]
     pub file_name: String,
-    #[serde(default = "default_rolling")]
     pub rolling: String,
-    #[serde(default = "default_format")]
     pub format: String,
-    #[serde(default = "default_true")]
     pub with_level: bool,
-    #[serde(default = "default_true")]
     pub with_target: bool,
-    #[serde(default = "default_true")]
     pub with_thread_ids: bool,
-    #[serde(default = "default_true")]
     pub with_thread_names: bool,
-    #[serde(default = "default_true")]
     pub with_source_location: bool,
-}
-fn default_filter_level() -> String {
-    "info".into()
-}
-fn default_directory() -> String {
-    "./logs".into()
-}
-fn default_file_name() -> String {
-    "app.log".into()
-}
-fn default_rolling() -> String {
-    "daily".into()
-}
-fn default_format() -> String {
-    FORMAT_FULL.into()
 }
 
 impl Default for LogConfig {
     fn default() -> Self {
         Self {
-            filter_level: default_filter_level(),
+            filter_level: "info".to_owned(),
             with_ansi: true,
-            stdout: false,
-            directory: default_directory(),
-            file_name: default_file_name(),
-            rolling: default_rolling(),
-            format: default_format(),
+            stdout: true,
+            directory: "./logs".to_owned(),
+            file_name: "app.log".to_owned(),
+            rolling: "daily".to_owned(),
+            format: FORMAT_FULL.to_owned(),
             with_level: true,
             with_target: true,
             with_thread_ids: true,

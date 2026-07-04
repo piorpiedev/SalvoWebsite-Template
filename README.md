@@ -11,7 +11,7 @@ cargo run
 cargo test
 ```
 # Tip
-- If the database is sqlite or the database migration has been run, please use the account zhangsan with password 123 to login.
+- If the database is sqlite or the database migration has been run, please use the account Pior with password 123 to login.
 - The database connection string is in config/config.toml, but if you use sqlx or seaorm, the library itself reads the configuration from .env file to generate entities, run migrations, and validate. So when you modify the database connection string, you need to change two places at the same time.
 # orm doc or home page link
 🎯 You have chosen sqlx, documentation can be viewed here:https://github.com/launchbadge/sqlx

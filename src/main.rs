@@ -1,15 +1,11 @@
-use salvo::catcher::Catcher;
 use salvo::conn::rustls::{Keycert, RustlsConfig};
 use salvo::prelude::*;
 use salvo::server::ServerHandle;
-use serde::Serialize;
-use tokio::signal;
-use tracing::info;
+use tokio::fs;
 
 mod config;
 mod db;
 mod hoops;
-mod models;
 mod routers;
 mod utils;
 
@@ -18,99 +14,67 @@ pub use error::AppError;
 
 pub type AppResult<T> = Result<T, AppError>;
 pub type JsonResult<T> = Result<Json<T>, AppError>;
-pub type EmptyResult = Result<Json<Empty>, AppError>;
-
-pub fn json_ok<T>(data: T) -> JsonResult<T> {
-    Ok(Json(data))
-}
-#[derive(Serialize, ToSchema, Clone, Copy, Debug)]
-pub struct Empty {}
-pub fn empty_ok() -> JsonResult<Empty> {
-    Ok(Json(Empty {}))
-}
 
 #[tokio::main]
 async fn main() {
-    crate::config::init();
+    crate::config::init().await;
     let config = crate::config::get();
     crate::db::init(&config.db).await;
 
     let _guard = config.log.guard();
     tracing::info!("log level: {}", &config.log.filter_level);
 
-    let service = Service::new(routers::root())
-        .catcher(Catcher::default().hoop(hoops::error_404))
-        .hoop(hoops::cors_hoop());
+    let service = routers::create_service();
     println!("🔄 listen on {}", &config.listen_addr);
+
     //Acme support, automatically get TLS certificate from Let's Encrypt. For example, see https://github.com/salvo-rs/salvo/blob/main/examples/acme-http01-quinn/src/main.rs
-    if let Some(tls) = &config.tls {
+    if config.tls.enabled {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("Failed to install rustls crypto provider");
+
+        let cert = fs::read_to_string(&config.tls.cert_path)
+            .await
+            .expect("unable to read tls cert file");
+        let key = fs::read_to_string(&config.tls.key_path)
+            .await
+            .expect("unable to read tls key file");
         let listen_addr = &config.listen_addr;
-        println!(
-            "📖 Open API Page: https://{}/scalar",
-            listen_addr.replace("0.0.0.0", "127.0.0.1")
-        );
-        println!(
-            "🔑 Login Page: https://{}/login",
-            listen_addr.replace("0.0.0.0", "127.0.0.1")
-        );
-        let config = RustlsConfig::new(Keycert::new().cert(tls.cert.clone()).key(tls.key.clone()));
-        let acceptor = TcpListener::new(listen_addr).rustls(config).bind().await;
+        let rustls_config = RustlsConfig::new(Keycert::new().cert(cert.clone()).key(key.clone()));
+        let listener = TcpListener::new(listen_addr).rustls(rustls_config.clone());
+        let acceptor = QuinnListener::new(rustls_config.build_quinn_config().unwrap(), listen_addr)
+            .join(listener)
+            .bind()
+            .await;
         let server = Server::new(acceptor);
-        tokio::spawn(shutdown_signal(server.handle()));
+        hook_stop(server.handle());
         server.serve(service).await;
     } else {
-        println!(
-            "📖 Open API Page: http://{}/scalar",
-            config.listen_addr.replace("0.0.0.0", "127.0.0.1")
-        );
-        println!(
-            "🔑 Login Page: http://{}/login",
-            config.listen_addr.replace("0.0.0.0", "127.0.0.1")
-        );
         let acceptor = TcpListener::new(&config.listen_addr).bind().await;
         let server = Server::new(acceptor);
-        tokio::spawn(shutdown_signal(server.handle()));
+        hook_stop(server.handle());
         server.serve(service).await;
     }
 }
 
-async fn shutdown_signal(handle: ServerHandle) {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => info!("ctrl_c signal received"),
-        _ = terminate => info!("terminate signal received"),
-    }
-    handle.stop_graceful(std::time::Duration::from_secs(60));
+fn hook_stop(handle: ServerHandle) {
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c().await.unwrap();
+        handle.stop_graceful(std::time::Duration::from_secs(60));
+    });
 }
 
 #[cfg(test)]
 mod tests {
-    use salvo::prelude::*;
     use salvo::test::{ResponseExt, TestClient};
 
     use crate::config;
+    use crate::routers::create_service;
 
     #[tokio::test]
     async fn test_hello_world() {
-        config::init();
-
-        let service = Service::new(crate::routers::root());
+        config::init().await;
+        let service = create_service();
 
         let content = TestClient::get(format!(
             "http://{}",

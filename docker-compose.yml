@@ -1,0 +1,24 @@
+services:
+  postgres:
+    build:
+      context: .
+      network: host
+      dockerfile: Dockerfile
+    container_name: postgres_db
+    restart: no
+    network_mode: host
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: CHANGE-ME
+      POSTGRES_DB: example_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-cron.sql:/docker-entrypoint-initdb.d/init-cron.sql:ro
+    command: [
+      "postgres",
+      "-c", "shared_preload_libraries=pg_cron",
+      "-c", "cron.database_name=postgres"
+    ]
+
+volumes:
+  postgres_data:

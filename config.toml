@@ -2,11 +2,28 @@ listen_addr = "127.0.0.1:8008"
 
 [db]
 url = "postgres://postgres:root@127.0.0.1:5432/example_website"
-
-[jwt]
-secret = "yoursecret"
-expiry = 3600
+pool_size = 10
+tcp_timeout = 10000
+connection_timeout = 30000
+statement_timeout = 30000
+helper_threads = 10
+enforce_tls = false
 
 [log]
+filter_level = "info"
+with_ansi = true
+stdout = true
+directory = "./logs"
 file_name = "app.log"
 rolling = "daily"
+format = "full"
+with_level = true
+with_target = true
+with_thread_ids = true
+with_thread_names = true
+with_source_location = true
+
+[tls]
+enabled = false
+cert_path = ""
+key_path = ""
