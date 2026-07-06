@@ -34,7 +34,7 @@ pub struct DbConfig {
 impl Default for DbConfig {
     fn default() -> Self {
         Self {
-            url: "postgres://root:admin@127.0.0.1:5432/postgres".to_owned(),
+            url: "postgres://dev:CHANGE-ME@127.0.0.1:5432/example_db".to_owned(),
             pool_size: 10,
             min_idle: None,
             tcp_timeout: 10000,
