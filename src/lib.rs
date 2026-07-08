@@ -1,50 +1,51 @@
+pub mod config;
+pub mod core;
+mod features;
+pub use features::*;
+
 use rust_embed::RustEmbed;
 use salvo::catcher::Catcher;
 use salvo::prelude::*;
 use salvo::serve_static::{EmbeddedFileExt, static_embed};
 
-mod demo;
-mod login;
-mod user;
-
-use crate::hoops::{self, handle_404};
+use crate::misc::error_page;
 
 #[derive(RustEmbed)]
 #[folder = "assets"]
 struct Assets;
 
 pub fn create_service() -> Service {
-    Service::new(root()).catcher(Catcher::default().hoop(handle_404))
+    Service::new(router())
+        .catcher(Catcher::default().hoop(error_page))
+        .hoop(misc::cors_hoop()) // Applying to the service instead of the router so that OPTIONS preflight requests are handled automatically (https://salvo.rs/guide/features/cors.html)
 }
 
-fn root() -> Router {
+fn router() -> Router {
     let favicon = Assets::get("favicon.ico")
         .expect("favicon not found")
         .into_handler();
     let router = Router::new()
         .hoop(Logger::new())
-        .hoop(hoops::cors::cors_hoop())
-        .hoop(hoops::auth::handle_auto_auth)
-        .hoop(hoops::handle_404)
-        .get(demo::hello)
-        .push(Router::with_path("login").get(login::handle_login_page))
+        .hoop(auth::auto_auth_middleware)
+        .get(homepage::handle_homepage_page)
+        .push(Router::with_path("login").get(auth::handle_login_page))
         .push(
             Router::with_path("users")
-                .hoop(hoops::auth::require_auth)
-                .get(user::list_page),
+                .hoop(auth::require_auth_middleware)
+                .get(users::list_users_page),
         )
         .push(
             Router::with_path("api")
-                .push(Router::with_path("login").post(login::handle_login_post))
+                .push(Router::with_path("login").post(auth::handle_login_post))
                 .push(
                     Router::with_path("users")
-                        .hoop(hoops::auth::require_auth)
-                        .get(user::list_users)
-                        .post(user::create_user)
+                        .hoop(auth::require_auth_middleware)
+                        .get(users::list_users_api)
+                        .post(users::create_user_api)
                         .push(
                             Router::with_path("{user_id}")
-                                .put(user::update_user)
-                                .delete(user::delete_user),
+                                .put(users::update_user_api)
+                                .delete(users::delete_user_api),
                         ),
                 ),
         )

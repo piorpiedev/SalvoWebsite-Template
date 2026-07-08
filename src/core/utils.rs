@@ -62,17 +62,17 @@ macro_rules! template {
 
 #[macro_export]
 macro_rules! render_template {
-    ($path:literal) => {
-        {
+    ($res:expr, $path:literal) => {
+        $res.render({
             use askama::Template;
             Text::Html($crate::template!($path).render().unwrap())
-        }
+        })
     };
 
-    ($path:literal, $($tail:tt)*) => {
-        {
+    ($res:expr, $path:literal, $($tail:tt)*) => {
+        $res.render({
             use askama::Template;
             Text::Html($crate::template!($path, $($tail)*).render().unwrap())
-        }
+        })
     };
 }

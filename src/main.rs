@@ -1,30 +1,20 @@
+use example_website::core::database;
+use example_website::{config, create_service};
 use salvo::conn::rustls::{Keycert, RustlsConfig};
 use salvo::prelude::*;
 use salvo::server::ServerHandle;
 use tokio::fs;
 
-mod config;
-mod db;
-mod hoops;
-mod routers;
-mod utils;
-
-mod error;
-pub use error::AppError;
-
-pub type AppResult<T> = Result<T, AppError>;
-pub type JsonResult<T> = Result<Json<T>, AppError>;
-
 #[tokio::main]
 async fn main() {
-    crate::config::init().await;
+    config::init().await;
     let config = crate::config::get();
-    crate::db::init(&config.db).await;
+    database::init(&config.db).await;
 
     let _guard = config.log.guard();
     tracing::info!("log level: {}", &config.log.filter_level);
 
-    let service = routers::create_service();
+    let service = create_service();
     println!("🔄 listen on {}", &config.listen_addr);
 
     //Acme support, automatically get TLS certificate from Let's Encrypt. For example, see https://github.com/salvo-rs/salvo/blob/main/examples/acme-http01-quinn/src/main.rs
@@ -66,10 +56,10 @@ fn hook_stop(handle: ServerHandle) {
 
 #[cfg(test)]
 mod tests {
+    use example_website::create_service;
     use salvo::test::{ResponseExt, TestClient};
 
     use crate::config;
-    use crate::routers::create_service;
 
     #[tokio::test]
     async fn test_hello_world() {

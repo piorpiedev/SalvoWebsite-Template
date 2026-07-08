@@ -1,14 +1,13 @@
-use cookie::Cookie;
 use salvo::{Depot, FlowCtrl, Request, Response, handler, writing::Redirect};
-use time::{Duration, OffsetDateTime};
+use time::OffsetDateTime;
 
-use crate::{AppResult, config, db};
-
-pub const COOKIE_NAME: &str = "session_token";
-pub const SESSION_DURATION: Duration = Duration::days(30);
+use crate::{
+    auth::{COOKIE_NAME, SESSION_DURATION, db},
+    core::{database, error::AppResult},
+};
 
 #[handler]
-pub async fn handle_auto_auth(
+pub async fn auto_auth_middleware(
     req: &mut Request,
     depot: &mut Depot,
     res: &mut Response,
@@ -20,8 +19,8 @@ pub async fn handle_auto_auth(
 
     // Get the associated user
     let session_token = cookie.value();
-    let conn = db::pool();
-    let Some(session) = db::sessions::get_session(conn, session_token).await? else {
+    let conn = database::pool();
+    let Some(session) = db::get_session(conn, session_token).await? else {
         res.remove_cookie(COOKIE_NAME);
         return Ok(());
     };
@@ -29,7 +28,7 @@ pub async fn handle_auto_auth(
     // Refresh session if needed
     let now = OffsetDateTime::now_utc();
     if session.expires_at - now < SESSION_DURATION / 2 {
-        db::sessions::refresh_session(conn, session_token).await?;
+        db::refresh_session(conn, session_token).await?;
         let mut cookie = cookie.clone();
         cookie.set_expires(now + SESSION_DURATION);
         res.add_cookie(cookie);
@@ -40,18 +39,8 @@ pub async fn handle_auto_auth(
     Ok(())
 }
 
-pub fn gen_session_cookie<'a>(session_token: String, expires_at: OffsetDateTime) -> Cookie<'a> {
-    Cookie::build((COOKIE_NAME, session_token))
-        .path("/")
-        .same_site(cookie::SameSite::Strict)
-        .expires(expires_at)
-        .http_only(true)
-        .secure(config::get().tls.enabled)
-        .build()
-}
-
 #[handler]
-pub async fn require_auth(depot: &mut Depot, res: &mut Response, ctrl: &mut FlowCtrl) {
+pub async fn require_auth_middleware(depot: &mut Depot, res: &mut Response, ctrl: &mut FlowCtrl) {
     if !depot.contains_key("user.id") {
         res.render(Redirect::other("/login"));
         ctrl.skip_rest();

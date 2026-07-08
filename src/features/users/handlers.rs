@@ -3,21 +3,27 @@ use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::utils::hash_password;
-use crate::{AppResult, JsonResult, db, render_template};
+use crate::{
+    core::{
+        database,
+        error::{AppResult, JsonResult},
+        utils,
+    },
+    render_template,
+    users::db,
+};
 
 #[handler]
-pub async fn list_page(req: &mut Request, res: &mut Response) -> AppResult<()> {
+pub async fn list_users_page(req: &mut Request, res: &mut Response) {
     let is_fragment = req.headers().get("X-Fragment-Header");
     match is_fragment {
         Some(_) => {
-            res.render(render_template!("user_list_frag.html"));
+            render_template!(res, "user_list_frag.html");
         }
         None => {
-            res.render(render_template!("user_list_page.html"));
+            render_template!(res, "user_list_page.html");
         }
     }
-    Ok(())
 }
 
 #[derive(Deserialize, Validate, ToSchema)]
@@ -42,12 +48,12 @@ pub struct UserInfo {
 }
 
 #[endpoint(tags("users"))]
-pub async fn create_user(idata: JsonBody<UserUpdateData>) -> JsonResult<UserInfo> {
+pub async fn create_user_api(idata: JsonBody<UserUpdateData>) -> JsonResult<UserInfo> {
     let UserUpdateData { username, password } = idata.into_inner();
-    let password_hash = hash_password(&password)?;
+    let password_hash = utils::hash_password(&password)?;
 
-    let conn = db::pool();
-    let user_id = db::users::create_user(conn, &username, &password_hash).await?;
+    let conn = database::pool();
+    let user_id = db::create_user(conn, &username, &password_hash).await?;
 
     Ok(Json(UserInfo {
         id: user_id,
@@ -56,16 +62,16 @@ pub async fn create_user(idata: JsonBody<UserUpdateData>) -> JsonResult<UserInfo
 }
 
 #[endpoint(tags("users"), parameters(("user_id", description = "user id")))]
-pub async fn update_user(
+pub async fn update_user_api(
     user_id: PathParam<i32>,
     idata: JsonBody<UserUpdateData>,
 ) -> JsonResult<UserInfo> {
     let user_id = user_id.into_inner();
     let UserUpdateData { username, password } = idata.into_inner();
-    let password_hash = hash_password(&password)?;
+    let password_hash = utils::hash_password(&password)?;
 
-    let conn = db::pool();
-    db::users::update_user(conn, user_id, &username, &password_hash).await?;
+    let conn = database::pool();
+    db::update_user(conn, user_id, &username, &password_hash).await?;
 
     Ok(Json(UserInfo {
         id: user_id,
@@ -74,11 +80,11 @@ pub async fn update_user(
 }
 
 #[endpoint(tags("users"))]
-pub async fn delete_user(user_id: PathParam<i32>) -> AppResult<()> {
+pub async fn delete_user_api(user_id: PathParam<i32>) -> AppResult<()> {
     let user_id = user_id.into_inner();
 
-    let conn = db::pool();
-    db::users::delete_user(conn, user_id).await?;
+    let conn = database::pool();
+    db::delete_user(conn, user_id).await?;
 
     Ok(())
 }
@@ -110,8 +116,11 @@ pub struct UserListResponse {
 }
 
 #[endpoint(tags("users"))]
-pub async fn list_users(query: &mut Request, depot: &mut Depot) -> JsonResult<UserListResponse> {
-    let conn = db::pool();
+pub async fn list_users_api(
+    query: &mut Request,
+    depot: &mut Depot,
+) -> JsonResult<UserListResponse> {
+    let conn = database::pool();
     let query: UserListQuery = query.extract(depot).await?;
     let username_filter = query.username.clone().unwrap_or_default();
     let like_pattern = format!("%{}%", username_filter);

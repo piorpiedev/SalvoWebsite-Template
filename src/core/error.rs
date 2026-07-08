@@ -3,6 +3,9 @@ use salvo::oapi::{self, EndpointOutRegister, ToSchema};
 use salvo::prelude::*;
 use thiserror::Error;
 
+pub type AppResult<T> = Result<T, AppError>;
+pub type JsonResult<T> = Result<Json<T>, AppError>;
+
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("public: `{0}`")]

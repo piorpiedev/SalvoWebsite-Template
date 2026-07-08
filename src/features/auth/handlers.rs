@@ -6,7 +6,10 @@ use salvo::prelude::*;
 use serde::Deserialize;
 use validator::Validate;
 
-use crate::{AppResult, db, hoops::auth, utils};
+use crate::auth::{db, gen_session_cookie};
+use crate::core::error::AppResult;
+use crate::core::{database, utils};
+use crate::users;
 
 const FAILED_LOGIN_MSG: &str = "Account not exist or password is incorrect";
 // If the user is not found, the suppllied password will be hashed against this (result is ignored)
@@ -48,8 +51,8 @@ pub async fn handle_login_post(
     let login_data = login_data.into_inner();
 
     // Get user auth data
-    let conn = db::pool();
-    let Some(user) = db::users::get_user_auth(conn, &login_data.username).await? else {
+    let conn = database::pool();
+    let Some(user) = users::db::get_user_auth(conn, &login_data.username).await? else {
         let _ = black_box(utils::verify_password(&login_data.password, FAKE_HASH)); // Make sure that we still try against something that will 100% not work
         return Err(StatusError::unauthorized().brief(FAILED_LOGIN_MSG).into());
     };
@@ -60,8 +63,8 @@ pub async fn handle_login_post(
     }
 
     // Add session token
-    let session = db::sessions::create_session(conn, user.id).await?;
-    let cookie = auth::gen_session_cookie(session.token, session.expires_at);
+    let session = db::create_session(conn, user.id).await?;
+    let cookie = gen_session_cookie(session.token, session.expires_at);
     res.add_cookie(cookie);
 
     Ok(())

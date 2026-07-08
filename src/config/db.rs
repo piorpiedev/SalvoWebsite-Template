@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(default)]
 pub struct DbConfig {
     /// Settings for the primary database. This is usually writeable, but will be read-only in
     /// some configurations.

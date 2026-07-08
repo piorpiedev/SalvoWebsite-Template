@@ -11,6 +11,7 @@ const FORMAT_JSON: &str = "json";
 const FORMAT_FULL: &str = "full";
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(default)]
 pub struct LogConfig {
     pub filter_level: String,
     pub with_ansi: bool,

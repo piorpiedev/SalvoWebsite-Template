@@ -1,4 +1,4 @@
-use crate::db::Conn;
+use crate::core::database::Conn;
 
 pub struct UserAuth {
     pub id: i32,

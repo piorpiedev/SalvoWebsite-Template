@@ -4,12 +4,15 @@ use std::sync::OnceLock;
 use figment::Figment;
 use figment::providers::{Env, Format, Serialized, Toml};
 use serde::{Deserialize, Serialize};
-
-mod log;
-pub use log::LogConfig;
-mod db;
-pub use db::DbConfig;
 use tokio::fs;
+
+mod db;
+mod log;
+mod tls;
+
+pub use db::DbConfig;
+pub use log::LogConfig;
+pub use tls::TlsConfig;
 
 pub static CONFIG: OnceLock<ServerConfig> = OnceLock::new();
 
@@ -62,6 +65,7 @@ pub fn get() -> &'static ServerConfig {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(default)]
 pub struct ServerConfig {
     pub listen_addr: String,
 
@@ -69,14 +73,6 @@ pub struct ServerConfig {
     pub log: LogConfig,
     pub tls: TlsConfig,
 }
-
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-pub struct TlsConfig {
-    pub enabled: bool,
-    pub cert_path: String,
-    pub key_path: String,
-}
-
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
@@ -84,11 +80,7 @@ impl Default for ServerConfig {
 
             db: DbConfig::default(),
             log: LogConfig::default(),
-            tls: TlsConfig {
-                enabled: false,
-                cert_path: String::new(),
-                key_path: String::new(),
-            },
+            tls: TlsConfig::default(),
         }
     }
 }

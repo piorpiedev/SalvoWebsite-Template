@@ -1,7 +1,7 @@
 use sha2::{Digest, Sha256};
 use time::OffsetDateTime;
 
-use crate::{db::Conn, utils::random_string};
+use crate::core::{database::Conn, utils};
 
 const SESSION_TOKEN_SIZE: usize = 32;
 
@@ -15,7 +15,7 @@ pub struct Session {
 }
 
 pub async fn create_session(conn: &Conn, user_id: i32) -> Result<Session, anyhow::Error> {
-    let token = random_string(SESSION_TOKEN_SIZE);
+    let token = utils::random_string(SESSION_TOKEN_SIZE);
     let token_hash = hash_token(&token);
 
     let expires_at = sqlx::query_scalar!(
@@ -38,7 +38,10 @@ pub struct SessionStatus {
     pub user_id: i32,
 }
 
-pub async fn get_session(conn: &Conn, session_token: &str) -> Result<Option<SessionStatus>, anyhow::Error> {
+pub async fn get_session(
+    conn: &Conn,
+    session_token: &str,
+) -> Result<Option<SessionStatus>, anyhow::Error> {
     let token_hash: String = hash_token(session_token);
 
     let expires_at = sqlx::query_as!(

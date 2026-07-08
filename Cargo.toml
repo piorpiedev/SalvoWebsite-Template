@@ -9,17 +9,7 @@ readme = "./README.md"
 anyhow = "1.0.103"
 figment = { version = "0.10.19", features = ["env", "toml"] }
 rust-embed = "8.11.0"
-salvo = { version = "0.93.0", features = [
-    "anyhow",
-    "cookie",
-    "cors",
-    "oapi",
-    "serve-static",
-    "rustls",
-    "logging",
-    "test",
-    "quinn",
-] }
+salvo = { version = "0.93.0", features = ["anyhow", "cookie", "cors", "oapi", "serve-static", "rustls", "logging", "test", "quinn"] }
 serde = "1.0.228"
 thiserror = "2.0.18"
 time = "0.3.51"
