@@ -3,15 +3,10 @@ pub mod core;
 mod features;
 pub use features::*;
 
-use salvo::catcher::Catcher;
 use salvo::prelude::*;
 
-use crate::misc::error_page;
-
 pub fn create_service() -> Service {
-    Service::new(router())
-        .catcher(Catcher::default().hoop(error_page))
-        .hoop(misc::cors_hoop()) // Applying to the service instead of the router so that OPTIONS preflight requests are handled automatically (https://salvo.rs/guide/features/cors.html)
+    Service::new(router()).hoop(misc::cors_hoop()) // Applying to the service instead of the router so that OPTIONS preflight requests are handled automatically (https://salvo.rs/guide/features/cors.html)
 }
 
 fn router() -> Router {
