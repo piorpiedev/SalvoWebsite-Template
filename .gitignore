@@ -28,3 +28,4 @@ frontend/src/bindings
 
 # .env
 # config.toml
+# docker-compose.yml
