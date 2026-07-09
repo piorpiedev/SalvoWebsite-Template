@@ -18,7 +18,7 @@ if [ "$CURRENT_VERSION" != "$NEW_VERSION" ] ; then
             git push origin $NEW_VERSION
 
             echo "Uploading to GitHub..."
-            gh release create $NEW_VERSION target/release/rustcdn --notes-file CHANGELOG.md
+            gh release create $NEW_VERSION target/release/example_website --notes-file CHANGELOG.md
             echo "Done!"
         else
             echo "Unable to build, cleaning up..."
