@@ -7,7 +7,7 @@ use validator::Validate;
 use crate::{
     core::{
         database,
-        error::{AppError, AppResult, JsonResult},
+        error::{AppResult, JsonResult},
         utils,
     },
     users::db,
