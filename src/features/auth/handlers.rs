@@ -1,6 +1,5 @@
 use std::hint::black_box;
 
-use askama::Template;
 use salvo::oapi::extract::*;
 use salvo::prelude::*;
 use serde::Deserialize;
@@ -9,7 +8,7 @@ use validator::Validate;
 use crate::auth::{db, gen_session_cookie};
 use crate::core::error::AppResult;
 use crate::core::{database, utils};
-use crate::users;
+use crate::{render_template, users};
 
 const FAILED_LOGIN_MSG: &str = "Account not exist or password is incorrect";
 // If the user is not found, the suppllied password will be hashed against this (result is ignored)
@@ -17,13 +16,7 @@ const FAKE_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$fZHPU4UFZ+uzv5gZH7gAPQ$d
 
 #[handler]
 pub async fn handle_login_page(res: &mut Response) -> AppResult<()> {
-    #[derive(Template)]
-    #[template(path = "login.html")]
-    struct LoginTemplate {}
-
-    let hello_tmpl = LoginTemplate {};
-    res.render(Text::Html(hello_tmpl.render().unwrap()));
-
+    render_template!(res, "login.html");
     Ok(())
 }
 
