@@ -1,30 +1,30 @@
 use salvo::oapi::extract::*;
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use validator::Validate;
 
 use crate::{
     core::{
         database,
-        error::{AppResult, JsonResult},
+        error::{AppError, AppResult, JsonResult},
         utils,
     },
-    render_template,
     users::db,
 };
 
-#[handler]
-pub async fn list_users_page(req: &mut Request, res: &mut Response) {
-    let is_fragment = req.headers().get("X-Fragment-Header");
-    match is_fragment {
-        Some(_) => {
-            render_template!(res, "user_list_frag.html");
-        }
-        None => {
-            render_template!(res, "user_list_page.html");
-        }
-    }
-}
+// #[handler]
+// pub async fn list_users_page(req: &mut Request, res: &mut Response) {
+//     let is_fragment = req.headers().get("X-Fragment-Header");
+//     match is_fragment {
+//         Some(_) => {
+//             render_template!(res, "user_list_frag.html");
+//         }
+//         None => {
+//             render_template!(res, "user_list_page.html");
+//         }
+//     }
+// }
 
 #[derive(Deserialize, Validate, ToSchema)]
 pub struct UserUpdateData {
@@ -41,7 +41,8 @@ pub struct UserUpdateData {
     ))]
     pub password: String,
 }
-#[derive(ToSchema, Serialize, Debug)]
+#[derive(ToSchema, Serialize, Debug, TS)]
+#[ts(export)]
 pub struct UserInfo {
     pub id: i32,
     pub username: String,
@@ -155,5 +156,23 @@ pub async fn list_users_api(
         total,
         current_page: query.current_page,
         page_size: query.page_size,
+    }))
+}
+
+#[endpoint(tags("users"))]
+pub async fn get_me_api(depot: &mut Depot) -> JsonResult<UserInfo> {
+    let user_id = depot.get::<i32>("user.id").copied().map_err(|e| match e {
+        None => StatusError::unauthorized(),
+        Some(_) => StatusError::internal_server_error(),
+    })?;
+
+    let pool = database::pool();
+    let Some(user) = db::get_user_info(pool, user_id).await? else {
+        return Err(StatusError::internal_server_error().into());
+    };
+
+    Ok(Json(UserInfo {
+        id: user_id,
+        username: user.username,
     }))
 }
