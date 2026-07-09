@@ -8,17 +8,11 @@ use validator::Validate;
 use crate::auth::{db, gen_session_cookie};
 use crate::core::error::AppResult;
 use crate::core::{database, utils};
-use crate::{render_template, users};
+use crate::users;
 
 const FAILED_LOGIN_MSG: &str = "Account not exist or password is incorrect";
 // If the user is not found, the suppllied password will be hashed against this (result is ignored)
 const FAKE_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$fZHPU4UFZ+uzv5gZH7gAPQ$dGGTG7C+gNZDNGYcuuknxElKZM5WekmmWyCtNYVbYkk";
-
-#[handler]
-pub async fn login_page(res: &mut Response) -> AppResult<()> {
-    render_template!(res, "login.html");
-    Ok(())
-}
 
 #[derive(Deserialize, ToSchema, Validate, Default, Debug)]
 pub struct LoginData {

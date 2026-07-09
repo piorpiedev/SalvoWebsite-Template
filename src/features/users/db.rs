@@ -1,4 +1,4 @@
-use crate::core::database::Conn;
+use crate::{core::database::Conn, users::UserInfo};
 
 pub struct UserAuth {
     pub id: i32,
@@ -15,6 +15,23 @@ pub async fn get_user_auth(conn: &Conn, username: &str) -> Result<Option<UserAut
             LIMIT 1
         "#,
         username
+    )
+    .fetch_optional(conn)
+    .await?;
+
+    Ok(user)
+}
+
+pub async fn get_user_info(conn: &Conn, id: i32) -> Result<Option<UserInfo>, anyhow::Error> {
+    let user = sqlx::query_as!(
+        UserInfo,
+        r#"
+            SELECT id, username
+            FROM users
+            WHERE id = $1
+            LIMIT 1
+        "#,
+        id
     )
     .fetch_optional(conn)
     .await?;
