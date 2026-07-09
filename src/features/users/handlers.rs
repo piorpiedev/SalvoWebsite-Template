@@ -13,19 +13,6 @@ use crate::{
     users::db,
 };
 
-// #[handler]
-// pub async fn list_users_page(req: &mut Request, res: &mut Response) {
-//     let is_fragment = req.headers().get("X-Fragment-Header");
-//     match is_fragment {
-//         Some(_) => {
-//             render_template!(res, "user_list_frag.html");
-//         }
-//         None => {
-//             render_template!(res, "user_list_page.html");
-//         }
-//     }
-// }
-
 #[derive(Deserialize, Validate, ToSchema)]
 pub struct UserUpdateData {
     #[validate(length(
