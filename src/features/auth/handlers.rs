@@ -15,7 +15,7 @@ const FAILED_LOGIN_MSG: &str = "Account not exist or password is incorrect";
 const FAKE_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$fZHPU4UFZ+uzv5gZH7gAPQ$dGGTG7C+gNZDNGYcuuknxElKZM5WekmmWyCtNYVbYkk";
 
 #[handler]
-pub async fn handle_login_page(res: &mut Response) -> AppResult<()> {
+pub async fn login_page(res: &mut Response) -> AppResult<()> {
     render_template!(res, "login.html");
     Ok(())
 }
@@ -37,10 +37,7 @@ pub struct LoginData {
 }
 
 #[endpoint(tags("auth"))]
-pub async fn handle_login_post(
-    login_data: JsonBody<LoginData>,
-    res: &mut Response,
-) -> AppResult<()> {
+pub async fn login_api(login_data: JsonBody<LoginData>, res: &mut Response) -> AppResult<()> {
     let login_data = login_data.into_inner();
 
     // Get user auth data

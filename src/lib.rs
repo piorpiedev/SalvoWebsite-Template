@@ -27,8 +27,8 @@ fn router() -> Router {
     let router = Router::new()
         .hoop(Logger::new())
         .hoop(auth::auto_auth_middleware)
-        .get(homepage::handle_homepage_page)
-        .push(Router::with_path("login").get(auth::handle_login_page))
+        .get(homepage::homepage_page)
+        .push(Router::with_path("login").get(auth::login_page))
         .push(
             Router::with_path("users")
                 .hoop(auth::require_auth_middleware)
@@ -36,7 +36,7 @@ fn router() -> Router {
         )
         .push(
             Router::with_path("api")
-                .push(Router::with_path("login").post(auth::handle_login_post))
+                .push(Router::with_path("login").post(auth::login_api))
                 .push(
                     Router::with_path("users")
                         .hoop(auth::require_auth_middleware)
