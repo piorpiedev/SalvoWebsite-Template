@@ -3,8 +3,13 @@ use salvo::oapi::{self, EndpointOutRegister, ToSchema};
 use salvo::prelude::*;
 use thiserror::Error;
 
+pub type DbResult<T> = Result<T, sqlx::Error>;
+pub type DbStatus = DbResult<()>;
+
 pub type AppResult<T> = Result<T, AppError>;
-pub type JsonResult<T> = Result<Json<T>, AppError>;
+pub type AppStatus = AppResult<()>;
+
+pub type JsonResult<T> = AppResult<Json<T>>;
 
 #[derive(Error, Debug)]
 pub enum AppError {

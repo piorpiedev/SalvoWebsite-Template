@@ -1,11 +1,11 @@
-use crate::core::database::Conn;
+use crate::core::{database::Conn, error::{DbResult, DbStatus}};
 
 pub struct UserAuth {
     pub id: i32,
     pub password_hash: String,
 }
 
-pub async fn get_user_auth(conn: &Conn, username: &str) -> Result<Option<UserAuth>, anyhow::Error> {
+pub async fn get_user_auth(conn: &Conn, username: &str) -> DbResult<Option<UserAuth>> {
     let user = sqlx::query_as!(
         UserAuth,
         r#"
@@ -26,7 +26,7 @@ pub async fn create_user(
     conn: &Conn,
     username: &str,
     password_hash: &str,
-) -> Result<i32, anyhow::Error> {
+) -> DbResult<i32> {
     let user_id = sqlx::query_scalar!(
         r#"
             INSERT INTO users (username, password_hash)
@@ -47,7 +47,7 @@ pub async fn update_user(
     user_id: i32,
     username: &str,
     password_hash: &str,
-) -> Result<(), anyhow::Error> {
+) -> DbStatus {
     sqlx::query!(
         r#"
             UPDATE users
@@ -64,7 +64,7 @@ pub async fn update_user(
     Ok(())
 }
 
-pub async fn delete_user(conn: &Conn, user_id: i32) -> Result<(), anyhow::Error> {
+pub async fn delete_user(conn: &Conn, user_id: i32) -> DbStatus {
     sqlx::query!(
         r#"
             DELETE FROM users
