@@ -9,7 +9,7 @@ pub type JsonResult<T> = Result<Json<T>, AppError>;
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("public: `{0}`")]
-    Public(String),
+    Public(StatusCode, String),
     #[error("internal: `{0}`")]
     Internal(String),
     #[error("salvo internal error: `{0}`")]
@@ -20,14 +20,18 @@ pub enum AppError {
     HttpParse(#[from] ParseError),
     #[error("anyhow error:`{0}`")]
     Anyhow(#[from] anyhow::Error),
-    #[error("sqlx::Error:`{0}`")]
+    #[error("sqlx error:`{0}`")]
     SqlxError(#[from] sqlx::Error),
     #[error("validation error:`{0}`")]
     Validation(#[from] validator::ValidationErrors),
 }
 impl AppError {
-    pub fn public<S: Into<String>>(msg: S) -> Self {
-        Self::Public(msg.into())
+    pub fn public<S: Into<String>>(code: StatusCode, msg: S) -> Self {
+        Self::Public(code, msg.into())
+    }
+
+    pub fn bad_request<S: Into<String>>(msg: S) -> Self {
+        Self::public(StatusCode::BAD_REQUEST, msg)
     }
 
     pub fn internal<S: Into<String>>(msg: S) -> Self {
@@ -48,7 +52,17 @@ impl Writer for AppError {
                 tracing::error!(error = ?e, "salvo error");
                 StatusError::internal_server_error().brief("Unknown error happened in salvo.")
             }
-            Self::Public(msg) => StatusError::internal_server_error().brief(msg),
+            Self::Public(code, msg) => StatusError::from_code(code)
+                .unwrap_or(StatusError::internal_server_error())
+                .brief(msg),
+            Self::Validation(e) => StatusError::bad_request().brief(
+                e.field_errors()
+                    .values()
+                    .flat_map(|errs| errs.iter())
+                    .find_map(|err| err.message.as_ref())
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| "Validation failed".to_owned()),
+            ),
             Self::Internal(msg) => {
                 tracing::error!(msg = msg, "internal error");
                 StatusError::internal_server_error()
