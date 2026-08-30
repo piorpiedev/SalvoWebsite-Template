@@ -19,7 +19,7 @@ pub fn create_service() -> Service {
 
 fn router() -> Router {
     let mut router = Router::new().push(
-        Router::with_path("/api")
+        Router::with_path("api")
             .hoop(Logger::new())
             .hoop(auth::auto_auth_middleware)
             .push(Router::with_path("login").post(auth::login_api))
