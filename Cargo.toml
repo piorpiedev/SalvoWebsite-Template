@@ -8,18 +8,8 @@ readme = "./README.md"
 [dependencies]
 anyhow = "1.0.103"
 figment = { version = "0.10.19", features = ["env", "toml"] }
-rust-embed = "8.11.0"
-salvo = { version = "0.93.0", features = [
-    "anyhow",
-    "cookie",
-    "cors",
-    "oapi",
-    "serve-static",
-    "rustls",
-    "logging",
-    "test",
-    "quinn",
-] }
+rust-embed = { version = "8.11.0", features = ["salvo", "tokio"] }
+salvo = { version = "0.93.0", features = ["anyhow", "cookie", "cors", "oapi", "serve-static", "rustls", "logging", "test", "quinn"] }
 serde = { version = "1.0.228", features = ["derive"] }
 thiserror = "2.0.18"
 time = "0.3.51"
