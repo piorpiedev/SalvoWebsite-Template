@@ -51,7 +51,7 @@ fn router() -> Router {
         )
         .push(Router::with_path("favicon.ico").get(favicon))
         .push(Router::with_path("assets/{**rest}").get(static_embed::<Assets>()));
-    let doc = OpenApi::new("salvo web api", "0.0.1").merge_router(&router);
+    let doc = OpenApi::new("SalvoWebsite Template", env!("CARGO_PKG_VERSION")).merge_router(&router);
     router
         .unshift(doc.into_router("/api-doc/openapi.json"))
         .unshift(Scalar::new("/api-doc/openapi.json").into_router("scalar"))
