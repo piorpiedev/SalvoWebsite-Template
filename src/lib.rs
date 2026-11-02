@@ -37,7 +37,7 @@ fn router() -> Router {
             ),
     );
 
-    let doc = OpenApi::new("salvo web api", "0.0.1").merge_router(&router);
+    let doc = OpenApi::new("SalvoWebsite Template", env!("CARGO_PKG_VERSION")).merge_router(&router);
     router = router
         .unshift(doc.into_router("/api/api-doc/openapi.json"))
         .unshift(Scalar::new("/api/api-doc/openapi.json").into_router("api/scalar"));
